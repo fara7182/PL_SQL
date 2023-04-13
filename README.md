@@ -1,2 +1,2 @@
 # PL-SQL
-Self-created database from scratch on APEX ORACLE, as well as queries that were created during operation
+I have created a database of wholesale sales of household appliances in the PL/SQL programming language on the APEX ORACLE platform. During operation, tables, relationships, queries, views, procedures, functions, packages, triggers are created.
