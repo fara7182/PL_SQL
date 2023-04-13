@@ -1,0 +1,330 @@
+1)
+Запрос
+IQR and higher outlier
+
+
+SELECT DISTINCT 
+  Laboratory.name AS Лаборатория,
+  Facility.name AS Услуга,
+  PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY (CAST(DateAdd(Minute, DateDiff(Minute, Application.registration_date, Application.end_date), 00) AS float))) OVER (PARTITION BY Facility.name) as q1,
+  PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY (CAST(DateAdd(Minute, DateDiff(Minute, Application.registration_date, Application.end_date), 00) AS float))) OVER (PARTITION BY Facility.name) as q3,
+  (PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY (CAST(DateAdd(Minute, DateDiff(Minute, Application.registration_date, Application.end_date), 00) AS float))) OVER (PARTITION BY Facility.name) -
+  PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY (CAST(DateAdd(Minute, DateDiff(Minute, Application.registration_date, Application.end_date), 00) AS float))) OVER (PARTITION BY Facility.name)) AS iqr,
+  (PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY (CAST(DateAdd(Minute, DateDiff(Minute, Application.registration_date, Application.end_date), 00) AS float))) OVER (PARTITION BY Facility.name) -
+  PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY (CAST(DateAdd(Minute, DateDiff(Minute, Application.registration_date, Application.end_date), 00) AS float))) OVER (PARTITION BY Facility.name))*1.5 + 
+  PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY (CAST(DateAdd(Minute, DateDiff(Minute, Application.registration_date, Application.end_date), 00) AS float))) OVER (PARTITION BY Facility.name) AS Higher
+FROM
+  Account
+  INNER JOIN Sample
+    ON Sample.id = Account.sample_id
+  INNER JOIN Facility
+    ON Facility.id = Account.Facility_id
+  INNER JOIN Laboratory
+    ON Laboratory.id = Sample.Laboratory_id
+  INNER JOIN Application
+    ON Application.id = Sample.Application_id
+  INNER JOIN Clinic
+    ON Clinic.id = Application.Clinic_id
+  INNER JOIN Clinic_factor
+    ON Clinic.id = Clinic_factor.Clinic_id
+  INNER JOIN ClinicCategoryFactor
+    ON ClinicCategoryFactor.id = Clinic_factor.factor_id
+WHERE
+  Application.registration_date >= :datefrom AND Application.registration_date <= :datetill AND ClinicCategoryFactor.name IN ('Заказчики 1',
+  'Заказчики 2', 'Заказчики 3') AND Laboratory.name IN ('LAB1', 'LAB2')
+GROUP BY
+  Laboratory.name,
+  Facility.name,
+  Application.registration_date, 
+  Application.end_date
+ORDER BY 
+  Laboratory.name ASC,
+  Facility.name ASC
+
+
+2)Запрос количество для каждой категорий
+
+SELECT
+
+  (Count(Сlient.Сlient_phone) - (SELECT
+    Count(Сlient.Сlient_email_address) FROM
+    Application
+  INNER JOIN Сlient
+    ON Сlient.id = Application.Сlient_id
+  INNER JOIN Clinic
+    ON Clinic.id = Application.Clinic_id
+  INNER JOIN Clinic_factor
+    ON Clinic.id = Clinic_factor.Clinic_id
+  INNER JOIN ClinicCategoryFactor
+    ON ClinicCategoryFactor.id = Clinic_factor.factor_id WHERE
+    Сlient.Сlient_email_address != '' AND Сlient.Сlient_phone != '' AND
+    Application.end_date >= :datefrom AND Application.end_date <= :datetill AND ClinicCategoryFactor.name IN ('Кабинет 1'))) AS Номер,
+    
+    
+     ((SELECT
+    Count(Сlient.Сlient_email_address) FROM
+    Application
+  INNER JOIN Сlient
+    ON Сlient.id = Application.Сlient_id
+  INNER JOIN Clinic
+    ON Clinic.id = Application.Clinic_id
+  INNER JOIN Clinic_factor
+    ON Clinic.id = Clinic_factor.Clinic_id
+  INNER JOIN ClinicCategoryFactor
+    ON ClinicCategoryFactor.id = Clinic_factor.factor_id WHERE
+    Сlient.Сlient_email_address != '' AND Application.end_date >= :datefrom AND
+    Application.end_date <= :datetill AND ClinicCategoryFactor.name IN ('Кабинет 1')) - (SELECT
+    Count(Сlient.Сlient_email_address) FROM
+    Application
+  INNER JOIN Сlient
+    ON Сlient.id = Application.Сlient_id
+  INNER JOIN Clinic
+    ON Clinic.id = Application.Clinic_id
+  INNER JOIN Clinic_factor
+    ON Clinic.id = Clinic_factor.Clinic_id
+  INNER JOIN ClinicCategoryFactor
+    ON ClinicCategoryFactor.id = Clinic_factor.factor_id WHERE
+    Сlient.Сlient_email_address != '' AND Сlient.Сlient_phone != '' AND
+    Application.end_date >= :datefrom AND Application.end_date <= :datetill AND ClinicCategoryFactor.name IN ('Кабинет 1'))) AS Почта,
+
+  (SELECT
+    Count(Сlient.Сlient_email_address) FROM
+    Application
+  INNER JOIN Сlient
+    ON Сlient.id = Application.Сlient_id
+  INNER JOIN Clinic
+    ON Clinic.id = Application.Clinic_id
+  INNER JOIN Clinic_factor
+    ON Clinic.id = Clinic_factor.Clinic_id
+  INNER JOIN ClinicCategoryFactor
+    ON ClinicCategoryFactor.id = Clinic_factor.factor_id WHERE
+    Сlient.Сlient_email_address != '' AND Сlient.Сlient_phone != '' AND
+    Application.end_date >= :datefrom AND Application.end_date <= :datetill AND ClinicCategoryFactor.name IN ('Кабинет 1')) AS Оба_есть,
+    
+    
+  ((SELECT
+    Count(Сlient.id) FROM
+    Application
+  INNER JOIN Сlient
+    ON Сlient.id = Application.Сlient_id
+  INNER JOIN Clinic
+    ON Clinic.id = Application.Clinic_id
+  INNER JOIN Clinic_factor
+    ON Clinic.id = Clinic_factor.Clinic_id
+  INNER JOIN ClinicCategoryFactor
+    ON ClinicCategoryFactor.id = Clinic_factor.factor_id WHERE
+    Application.end_date >= :datefrom AND Application.end_date <= :datetill AND ClinicCategoryFactor.name IN ('Кабинет 1')) - (SELECT
+    Count(Сlient.Сlient_email_address) FROM
+    Application
+  INNER JOIN Сlient
+    ON Сlient.id = Application.Сlient_id
+  INNER JOIN Clinic
+    ON Clinic.id = Application.Clinic_id
+  INNER JOIN Clinic_factor
+    ON Clinic.id = Clinic_factor.Clinic_id
+  INNER JOIN ClinicCategoryFactor
+    ON ClinicCategoryFactor.id = Clinic_factor.factor_id WHERE
+    Сlient.Сlient_email_address != '' AND Application.end_date >= :datefrom AND
+    Application.end_date <= :datetill AND ClinicCategoryFactor.name IN ('Кабинет 1')) - (SELECT
+    Count(Сlient.Сlient_phone) FROM
+    Application
+  INNER JOIN Сlient
+    ON Сlient.id = Application.Сlient_id
+  INNER JOIN Clinic
+    ON Clinic.id = Application.Clinic_id
+  INNER JOIN Clinic_factor
+    ON Clinic.id = Clinic_factor.Clinic_id
+  INNER JOIN ClinicCategoryFactor
+    ON ClinicCategoryFactor.id = Clinic_factor.factor_id WHERE
+    Сlient.Сlient_phone != '' AND Application.end_date >= :datefrom AND
+    Application.end_date <= :datetill AND ClinicCategoryFactor.name IN ('Кабинет 1')) + (SELECT
+    Count(Сlient.Сlient_email_address) FROM
+    Application
+  INNER JOIN Сlient
+    ON Сlient.id = Application.Сlient_id
+  INNER JOIN Clinic
+    ON Clinic.id = Application.Clinic_id
+  INNER JOIN Clinic_factor
+    ON Clinic.id = Clinic_factor.Clinic_id
+  INNER JOIN ClinicCategoryFactor
+    ON ClinicCategoryFactor.id = Clinic_factor.factor_id WHERE
+    Сlient.Сlient_email_address != '' AND Сlient.Сlient_phone != '' AND
+    Application.end_date >= :datefrom AND Application.end_date <= :datetill AND ClinicCategoryFactor.name IN ('Кабинет 1'))) AS Пустые_оба,
+    
+  (SELECT
+    Count(Application.id) FROM
+    Application
+  INNER JOIN Сlient
+    ON Сlient.id = Application.Сlient_id
+  INNER JOIN Clinic
+    ON Clinic.id = Application.Clinic_id
+  INNER JOIN Clinic_factor
+    ON Clinic.id = Clinic_factor.Clinic_id
+  INNER JOIN ClinicCategoryFactor
+    ON ClinicCategoryFactor.id = Clinic_factor.factor_id WHERE
+    Application.end_date >= :datefrom AND Application.end_date <= :datetill AND ClinicCategoryFactor.name IN ('Кабинет 1')) AS Общее_количество   
+ 
+    
+FROM
+  Application
+  INNER JOIN Сlient
+    ON Сlient.id = Application.Сlient_id
+  INNER JOIN Clinic
+    ON Clinic.id = Application.Clinic_id
+  INNER JOIN Clinic_factor
+    ON Clinic.id = Clinic_factor.Clinic_id
+  INNER JOIN ClinicCategoryFactor
+    ON ClinicCategoryFactor.id = Clinic_factor.factor_id
+WHERE
+  Сlient.Сlient_phone != '' AND Application.end_date >= :datefrom AND
+  Application.end_date <= :datetill AND ClinicCategoryFactor.name IN ('Кабинет 1')
+
+
+
+
+
+3)
+Написал PL/SQL процедуру, которая с помощью команды dbms_output.put_line выводит содержание первых 2-х строк из таблицы 1
+
+Create or replace procedure print_items as 
+Begin 
+For item_rec in (
+Select * from items where rownum <= 2
+) loop 
+dbms_output.put_line(
+'id: ' || item_rec.id || ', item_name: ' || item_rec.name || ', serial_number: ' || item_rec.serial_number
+);
+ End loop; 
+End;
+/
+
+
+4)
+Скрипт, который преобразует XML в JSON (Python)
+
+XML:
+
+<breakfast_menu>
+<food>
+<name>Бельгийские Вафли</name>
+<price>$5.95</price>
+<description>две известных Бельгийских Вафли с обилием настоящего кленового сиропа</description>
+<calories>650</calories>
+</food>
+<food>
+<name>Домашний Завтрак</name>
+<price>$6.95</price>
+<description>пара яиц, бекон или колбаса, тост, и наши всегда популярные картофельные оладьи</description>
+<calories>950</calories>
+</food>
+</breakfast_menu>
+
+Преобразование в JSON:
+
+{
+"breakfast_menu": {
+"food": [
+{
+"name": "Бельгийские Вафли",
+"price": "$5.95",
+"description": "две известных Бельгийских Вафли с обилием настоящего кленового сиропа",
+"calories": 650
+},
+{
+"name": "Домашний Завтрак",
+"price": "$6.95",
+"description": "пара яиц, бекон или колбаса, тост, и наши всегда популярные картофельные оладьи",
+"calories": 950
+}
+]
+}
+}
+
+
+
+5)
+Преобразование json в словарь (Python)
+
+{
+   "table":"GG_RFO.Z_FDOC",
+   "op_type":"I",
+   "op_ts":"2020-11-11 21:29:16.004203",
+   "current_ts":"2020-11-11T21:29:17.336012",
+   "pos":"00000333300036553944",
+   "after":{
+      "ID":296102701069,
+      "CLASS_ID":"FORM_CLIENT",
+      "C_NUM":"209918551",
+      "C_DOC_DATE":"2019-12-23 12:33:48",
+      "C_PARENT_FDOC":null,
+      "C_STATUS_DOC":3704273,
+      "C_DATE_AUDIT":"2020-11-11 21:29:07",
+      "SN":null,
+      "SU":null
+   }
+}
+Необходимо получить словарь следующего вида
+{
+   'op_type':'I',
+   'op_ts':'2020-11-11 21:29:16.004203',
+   'current_ts':'2020-11-11T21:29:17.336012',
+   'ID':296102701069,
+   'CLASS_ID':'FORM_CLIENT',
+   'C_NUM':'209918551',
+   'C_DOC_DATE':'2019-12-23 12:33:48',
+   'C_PARENT_FDOC':null,
+   'C_STATUS_DOC':3704273,
+   'C_DATE_AUDIT':'2020-11-11 21:29:07'
+}
+
+
+
+Ответ:
+
+Import json 
+
+json data = “
+{
+   "table":"GG_RFO.Z_FDOC",
+   "op_type":"I",
+   "op_ts":"2020-11-11 21:29:16.004203",
+   "current_ts":"2020-11-11T21:29:17.336012",
+   "pos":"00000333300036553944",
+   "after":{
+      "ID":296102701069,
+      "CLASS_ID":"FORM_CLIENT",
+      "C_NUM":"209918551",
+      "C_DOC_DATE":"2019-12-23 12:33:48",
+      "C_PARENT_FDOC":null,
+      "C_STATUS_DOC":3704273,
+      "C_DATE_AUDIT":"2020-11-11 21:29:07",
+      "SN":null,
+      "SU":null
+   }
+}
+“
+
+data = json.loads(json data)
+
+result = {
+  'op_type': data['op_type'],
+    'op_ts': data['op_ts'],
+    'current_ts': data['current_ts'],
+    'ID': data['after']['ID'],
+    'CLASS_ID': data['after']['CLASS_ID'],
+    'C_NUM': data['after']['C_NUM'],
+    'C_DOC_DATE': data['after']['C_DOC_DATE'],
+    'C_PARENT_FDOC': data['after']['C_PARENT_FDOC'],
+    'C_STATUS_DOC': data['after']['C_STATUS_DOC'],
+    'C_DATE_AUDIT': data['after']['C_DATE_AUDIT']
+}
+
+print(result)
+
+
+
+
+
+
+
+
